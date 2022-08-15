@@ -3,8 +3,9 @@
 todo
 
 ## Features
-* todo
-* todo
+* c++stl like container API
+* memory allocation in one piece 
+* advanced iterator
 
 ## Usage
 `SoA.cpp`
