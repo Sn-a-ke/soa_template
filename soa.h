@@ -319,8 +319,7 @@ private:
 	uint8_t* m_data;
 	int32_t m_size;
 	int32_t m_max_size;
-	soa_allocator m_allocator_inst;
-
+	
 private:
 	/********/
 
@@ -376,6 +375,7 @@ public:
 	{
 		destroy_elements(0, m_size);
 		using alloc_traits = std::allocator_traits<soa_allocator>;
+		soa_allocator m_allocator_inst;
 		alloc_traits::deallocate(m_allocator_inst, m_data, m_max_size * bytes_elements);
 		m_size = 0;
 	}
@@ -662,16 +662,33 @@ private:
 	template<typename T>
 	typename std::enable_if<std::is_move_constructible<T>::value>::type relocate_type(T* dest, const T* source, uint32_t count)
 	{
-		std::memmove(dest, source, sizeof(T) * count);
+		const int distance = std::distance(dest, source);
+		if (distance > count)
+		{
+			std::memmove(dest, source, sizeof(T) * count);
+		}
+		else
+		{
+			std::memcpy(dest, source, sizeof(T) * count);
+			if (dest < source)
+			{
+				destroy_element(dest + count, std::distance(dest + count, source + count));
+			}
+			else
+			{
+				destroy_element(source, distance);
+			}
+		}
 	}
 	template<typename T>
 	typename std::enable_if<!std::is_move_constructible<T>::value>::type relocate_type(T* dest, const T* source, uint32_t count)
 	{
 		using alloc_traits = std::allocator_traits<soa_allocator>;
+		soa_allocator m_allocator_inst;
 		while (count)
 		{
-			alloc_traits::construct(this->m_allocator_inst, dest++, T(*source));
-			alloc_traits::destroy(this->m_allocator_inst, source++);
+			alloc_traits::construct(m_allocator_inst, dest++, T(*source));
+			alloc_traits::destroy(m_allocator_inst, source++);
 			--count;
 		}
 	}
@@ -727,7 +744,7 @@ private:
 		{
 			const int32_t old_max = m_max_size;
 			m_max_size = new_max; // todo: calculate max
-
+			soa_allocator m_allocator_inst;
 			if (m_data)
 			{
 				uint8_t* old_data = m_data;
@@ -754,13 +771,19 @@ private:
 	void construct_element(T* const source, Types&&... args)
 	{
 		using alloc_traits = std::allocator_traits<soa_allocator>;
-		alloc_traits::construct(this->m_allocator_inst, source, std::forward<Types>(args)...);
+		soa_allocator m_allocator_inst;
+		alloc_traits::construct(m_allocator_inst, source, std::forward<Types>(args)...);
 	}
 	template<typename T>
-	void destroy_element(T* const source, const int32_t count)
+	void destroy_element(T* const source, const int32 count)
 	{
 		using alloc_traits = std::allocator_traits<soa_allocator>;
-		alloc_traits::destroy(this->m_allocator_inst, source);
+		soa_allocator m_allocator_inst;
+		while(count)
+		{
+			alloc_traits::destroy(m_allocator_inst, source);
+			count--
+		}
 	}
 
 	template<typename... Types>
