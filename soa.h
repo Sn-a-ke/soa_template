@@ -774,9 +774,13 @@ private:
 	void destroy_elements(int32_t index, const int32_t count)
 	{
 		SOA_ASSERT(index >= 0 && index < size() && count > 0);
-
-		int tmp[] = { 0, (this->destroy_element(get_data<Ts>() + index, count), 0)... };
-		(void)tmp;
+		using alloc_traits = std::allocator_traits<soa_allocator>;
+		soa_allocator m_allocator_inst;
+		for (int32_t i = 0; i < count; i++)
+		{
+			int tmp[] = { 0, (alloc_traits::destroy(m_allocator_inst, get_data<Ts>() + index + i), 0)... };
+			(void)tmp;
+		}
 	}
 
 	int32_t add_data(const int32_t count = 1)
